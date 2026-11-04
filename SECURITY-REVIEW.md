@@ -60,7 +60,7 @@ among the direct dependencies.
 2. In Claude Desktop, turn off the personal-area tools (`cartelle_personali`, `leggi_cartella_personale`, `ricerche_salvate`) if you don't want your notes sent to the AI provider.
 3. Keep tool approval on ("ask") for `accedi` and `scarica_documento`.
 4. Run `node dist\cli.js logout` when you finish a work session. It deletes the session file and the browser profile.
-5. Don't point `BDM_HOME` or `BDM_DOWNLOAD_DIR` at a synced folder (OneDrive, Dropbox). The session file would leave your machine.
+5. Don't point `BDM_HOME` or `BDM_DOWNLOAD_DIR` at a synced folder (OneDrive, Dropbox, Google Drive, Box, pCloud, Nextcloud…). The session file would leave your machine. The server refuses the common cases for `BDM_HOME`, but it can't recognise every sync client.
 6. Don't pull upstream changes without reviewing the diff first.
 
 ## Changes made after the review (branch `miglioramenti`)
@@ -71,7 +71,7 @@ The changes are on top of `bb90888`. Each one has tests: `npm run check` passes 
 |---|---|---|
 | `BDM_PERSONAL_AREA=off` (Claude Desktop: "Area personale") hides the 3 personal-area tools, the `note_personali` / `solo_cartelle_personali` / `includi_cartelle` parameters, and the note fields in `leggi_provvedimento` / `leggi_abstract`. On by default, as upstream. | Finding 8 | `src/config.ts`, `src/server.ts`, `src/tools/search.ts`, `src/tools/read.ts`, `manifest.json` |
 | New `esci` tool. It deletes the session file and the browser profile, and refuses while a login window is open, including one opened by another app running this server (it checks Chromium's profile lock). The CLI `logout` uses the same code. | Findings 3–4 | `src/session/logout.ts`, `src/tools/session.ts`, `src/cli.ts` |
-| A data folder inside OneDrive, Dropbox, Google Drive or iCloud is refused, so the session file can't be synced off the machine. The check covers both an explicit `BDM_HOME` and the default folder (`XDG_CONFIG_HOME`, `APPDATA`, `~/Library/Application Support`). Google Drive for desktop is recognised by the folders it creates (`My Drive`, `Il mio Drive`, `Shared drives`, `Drive condivisi`), so its `G:` drive and mirror folders are refused too. Symlinks and Windows junctions are followed before the check. | Finding 3 | `src/config.ts` |
+| Baseline protection, not a guarantee: a data folder inside OneDrive, Dropbox, Google Drive or iCloud is refused, so in those cases the session file isn't synced off the machine. The check covers both an explicit `BDM_HOME` and the default folder (`XDG_CONFIG_HOME`, `APPDATA`, `~/Library/Application Support`). Google Drive for desktop is recognised by the folders it creates (`My Drive`, `Il mio Drive`, `Shared drives`, `Drive condivisi`), so its `G:` drive and mirror folders are refused too. Symlinks and Windows junctions are followed before the check. Other sync clients (Box, pCloud, Nextcloud, custom Dropbox locations) aren't detected: finding their configured roots would need the registry or external processes, more risk than the check removes. | Finding 3 | `src/config.ts` |
 | The server instructions say that texts, abstracts and notes are data, not instructions. | Finding 7 | `src/server.ts` |
 | `npm run build` no longer uses `rm -rf`, so it works on Windows. | Finding 13 | `package.json` |
 | `note_personali` search text is capped at 200 characters. | Input limits | `src/tools/search.ts` |
