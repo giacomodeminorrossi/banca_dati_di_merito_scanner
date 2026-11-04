@@ -1,6 +1,6 @@
-import { readlink, rm } from "node:fs/promises";
+import { readFile, readlink, rm } from "node:fs/promises";
 import { hostname } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { storedPaths } from "../config.ts";
 import { BdpError } from "../errors.ts";
 import { loginInProgress } from "./login.ts";
@@ -46,7 +46,26 @@ export const profileInUse = async (profile = storedPaths().profile): Promise<boo
   if (!match) return true;
   const [, host, pid] = match;
   // Another machine's lock (a profile on a shared drive) cannot be checked: assume it is live.
-  return host !== hostname() || isAlive(Number(pid));
+  if (host !== hostname()) return true;
+  return holdsProfile(Number(pid), profile);
+};
+
+/**
+ * Whether `pid` is a browser using `profile`. After a crash and a reboot the
+ * lock's PID can belong to an unrelated process; where `/proc` shows the command
+ * line (Linux), the lock counts only if that process opened this profile, as
+ * Chromium itself checks. Elsewhere any live process counts.
+ */
+const holdsProfile = async (pid: number, profile: string): Promise<boolean> => {
+  if (!isAlive(pid)) return false;
+  let cmdline: string;
+  try {
+    cmdline = await readFile(`/proc/${pid}/cmdline`, "utf8");
+  } catch {
+    return true;
+  }
+  const flag = "--user-data-dir=";
+  return cmdline.split("\0").some((arg) => arg.startsWith(flag) && resolve(arg.slice(flag.length)) === resolve(profile));
 };
 
 const LOGIN_OPEN =

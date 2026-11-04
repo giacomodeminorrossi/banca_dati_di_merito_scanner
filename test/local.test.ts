@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import { spawn, type ChildProcess } from "node:child_process";
+import { once } from "node:events";
 import { access, mkdir, mkdtemp, readFile, stat, symlink, writeFile } from "node:fs/promises";
 import { homedir, hostname, tmpdir } from "node:os";
 import { join } from "node:path";
@@ -204,6 +206,14 @@ describe("logout", { skip: process.platform === "win32" }, () => {
     process.env.BDM_HOME = await mkdtemp(join(tmpdir(), "bdm-logout-"));
   });
 
+  /** A long-lived process started the way Playwright starts the browser on `profile`. */
+  const fakeBrowser = async (profile: string): Promise<ChildProcess> => {
+    const child = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)", "--", `--user-data-dir=${profile}`], { stdio: "ignore" });
+    child.unref();
+    await once(child, "spawn");
+    return child;
+  };
+
   const lockProfile = async (pid: number): Promise<void> => {
     await mkdir(browserProfileDir(), { recursive: true });
     await symlink(`${hostname()}-${pid}`, join(browserProfileDir(), "SingletonLock"));
@@ -212,8 +222,20 @@ describe("logout", { skip: process.platform === "win32" }, () => {
   it("sees a browser that another process has open on the profile", async () => {
     const profile = await mkdtemp(join(tmpdir(), "bdm-profile-"));
     assert.equal(await profileInUse(profile), false);
+    const browser = await fakeBrowser(profile);
+    try {
+      await symlink(`${hostname()}-${browser.pid}`, join(profile, "SingletonLock"));
+      assert.equal(await profileInUse(profile), true);
+    } finally {
+      browser.kill();
+    }
+  });
+
+  it("ignores a stale lock whose PID now belongs to another program", { skip: process.platform !== "linux" }, async () => {
+    const profile = await mkdtemp(join(tmpdir(), "bdm-profile-"));
+    // This test process is alive but is not a browser using the profile.
     await symlink(`${hostname()}-${process.pid}`, join(profile, "SingletonLock"));
-    assert.equal(await profileInUse(profile), true);
+    assert.equal(await profileInUse(profile), false);
   });
 
   it("ignores the lock a crashed browser left behind", async () => {
@@ -243,8 +265,13 @@ describe("logout", { skip: process.platform === "win32" }, () => {
 
   it("refuses to log out while a login window is open, and keeps the session", async () => {
     await saveSession(SESSION);
-    await lockProfile(process.pid);
-    await assert.rejects(logout(), isCode("parametri"));
-    await access(sessionFile());
+    const browser = await fakeBrowser(browserProfileDir());
+    try {
+      await lockProfile(browser.pid ?? 0);
+      await assert.rejects(logout(), isCode("parametri"));
+      await access(sessionFile());
+    } finally {
+      browser.kill();
+    }
   });
 });
