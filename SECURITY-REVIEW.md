@@ -5,7 +5,7 @@ This repository is an unmodified copy of
 (Apache-2.0, © Andrea Dorizza). The only change is the addition of this file and
 `INSTALL-WINDOWS.md`.
 
-- **Reviewed commit:** `bb90888695b1f035e67e1859b867dcadfa2192f4` (tag `reviewed-bb90888`, release v0.1.2)
+- **Reviewed commit:** `bb90888695b1f035e67e1859b867dcadfa2192f4` (upstream release v0.1.2; pin by this hash)
 - **Review date:** 2026-11-04
 - **Verdict:** safe with caveats
 
