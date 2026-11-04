@@ -33,7 +33,8 @@
       ],
       "env": {
         "BDM_DOWNLOAD_DIR": "${user_config.download_dir}",
-        "BDM_MIN_INTERVAL_MS": "${user_config.min_interval_ms}"
+        "BDM_MIN_INTERVAL_MS": "${user_config.min_interval_ms}",
+        "BDM_PERSONAL_AREA": "${user_config.personal_area}"
       }
     }
   },
@@ -51,6 +52,12 @@
       "default": 1000,
       "min": 250,
       "max": 10000
+    },
+    "personal_area": {
+      "type": "boolean",
+      "title": "Area personale",
+      "description": "Permette all'assistente di leggere cartelle personali, ricerche salvate e note. Disattivala per non inviarle al fornitore AI.",
+      "default": true
     }
   },
   "tools": [
@@ -61,6 +68,10 @@
     {
       "name": "accedi",
       "description": "Apre il browser per l'accesso con SPID, CIE, CNS o eIDAS."
+    },
+    {
+      "name": "esci",
+      "description": "Cancella sessione e profilo del browser da questo computer."
     },
     {
       "name": "risolvi_criteri",

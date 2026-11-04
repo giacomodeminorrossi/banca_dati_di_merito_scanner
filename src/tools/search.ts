@@ -42,7 +42,7 @@ const searchShape = <F extends readonly [string, ...string[]]>(fields: F) => ({
       a: z.string().optional().describe("AAAA-MM-GG"),
     })
     .optional(),
-  note_personali: z.string().trim().min(1).optional().describe("Cerca nelle note personali dell'utente."),
+  note_personali: z.string().trim().min(1).max(200).optional().describe("Cerca nelle note personali dell'utente."),
   solo_cartelle_personali: z
     .boolean()
     .default(false)
@@ -56,9 +56,21 @@ const searchShape = <F extends readonly [string, ...string[]]>(fields: F) => ({
 const provvedimentiShape = searchShape(PROVVEDIMENTO_FIELDS);
 const abstractShape = searchShape(ABSTRACT_FIELDS);
 
-type SearchInput =
-  | z.output<z.ZodObject<typeof provvedimentiShape>>
-  | z.output<z.ZodObject<typeof abstractShape>>;
+/** With the personal area off, the model is not even offered the parameters that read it. */
+const withoutPersonal = <S extends ReturnType<typeof searchShape>>(shape: S) => {
+  const { note_personali: _notes, solo_cartelle_personali: _folders, ...rest } = shape;
+  return rest;
+};
+
+type PersonalKeys = "note_personali" | "solo_cartelle_personali";
+
+type SearchInput = Omit<
+  z.output<z.ZodObject<typeof provvedimentiShape>> | z.output<z.ZodObject<typeof abstractShape>>,
+  PersonalKeys
+> & {
+  note_personali?: string | undefined;
+  solo_cartelle_personali?: boolean | undefined;
+};
 
 const toSearchParams = (target: Target, input: SearchInput): SearchParams => {
   if (input.da + input.quanti > RESULT_WINDOW) {
@@ -71,7 +83,7 @@ const toSearchParams = (target: Target, input: SearchInput): SearchParams => {
     size: input.quanti,
     sortField: input.ordina_per ?? (input.testo ? "rilevanza" : "data_pubblicazione"),
     sortOrder: input.ordine,
-    soloCartellePersonali: input.solo_cartelle_personali,
+    soloCartellePersonali: input.solo_cartelle_personali ?? false,
     notePersonali: input.note_personali,
   };
 };
@@ -112,7 +124,7 @@ const SEARCH_TOOL = { provvedimenti: "cerca_provvedimenti", abstract: "cerca_abs
   string
 >;
 
-export const registerSearchTools = (server: McpServer): void => {
+export const registerSearchTools = (server: McpServer, { personalArea }: { personalArea: boolean }): void => {
   server.registerTool(
     "risolvi_criteri",
     {
@@ -148,7 +160,7 @@ export const registerSearchTools = (server: McpServer): void => {
       title: "Cerca provvedimenti",
       description:
         "Cerca sentenze, ordinanze e decreti di merito nella Banca Dati, per testo, criteri di campo e date. Senza filtri restituisce gli ultimi pubblicati. Restituisce estremi, metadati, estratti evidenziati e gli abstract collegati. Gli estratti sono frammenti: non bastano per dire che cosa ha deciso un provvedimento. Prima di riferire il principio o l'esito di un provvedimento, leggine il testo con leggi_testo_provvedimento.",
-      inputSchema: provvedimentiShape,
+      inputSchema: personalArea ? provvedimentiShape : withoutPersonal(provvedimentiShape),
       annotations: READ_ONLY,
     },
     (input, { signal }) =>
@@ -189,7 +201,7 @@ export const registerSearchTools = (server: McpServer): void => {
       title: "Cerca abstract",
       description:
         "Cerca gli abstract della Banca Dati, cioè le sintesi dei principi affermati nei provvedimenti. Usalo per gli orientamenti su una questione. Un abstract non è una massima ufficiale: prima di citarlo come principio di un provvedimento, verificalo nel testo con leggi_testo_provvedimento. Senza filtri restituisce gli ultimi pubblicati.",
-      inputSchema: abstractShape,
+      inputSchema: personalArea ? abstractShape : withoutPersonal(abstractShape),
       annotations: READ_ONLY,
     },
     (input, { signal }) =>

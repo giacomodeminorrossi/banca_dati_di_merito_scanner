@@ -1,10 +1,9 @@
 #!/usr/bin/env node
-import { rm } from "node:fs/promises";
-import { browserProfileDir, sessionFile } from "./config.ts";
+import { sessionFile } from "./config.ts";
 import { BdpError, hintFor } from "./errors.ts";
 import { login } from "./session/login.ts";
+import { logout } from "./session/logout.ts";
 import { checkSession } from "./session/status.ts";
-import { clearSession } from "./session/store.ts";
 
 const USAGE = `banca-dati-merito-mcp — server MCP non ufficiale per la Banca Dati di Merito
 
@@ -36,10 +35,7 @@ const main = async (args: string[]): Promise<void> => {
       return;
     }
     case "logout": {
-      // The browser profile holds BDP and identity-provider cookies too: keeping it
-      // would let the next login skip authentication.
-      await clearSession();
-      await rm(browserProfileDir(), { recursive: true, force: true });
+      await logout();
       console.log("Sessione e profilo del browser cancellati.");
       return;
     }

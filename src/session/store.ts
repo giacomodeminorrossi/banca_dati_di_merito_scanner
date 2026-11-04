@@ -74,10 +74,6 @@ export const saveSession = async (session: Session): Promise<void> => {
   }
 };
 
-export const clearSession = async (): Promise<void> => {
-  await rm(sessionFile(), { force: true });
-};
-
 const domainMatches = (cookieDomain: string, host: string): boolean => {
   const domain = cookieDomain.startsWith(".") ? cookieDomain.slice(1) : cookieDomain;
   return host === domain || host.endsWith(`.${domain}`);

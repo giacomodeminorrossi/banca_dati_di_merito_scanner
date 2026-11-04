@@ -1,5 +1,6 @@
+import { readFileSync, realpathSync } from "node:fs";
 import { homedir } from "node:os";
-import { isAbsolute, join } from "node:path";
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { BdpError } from "./errors.ts";
 
 export const BDP_HOST = "bdp.giustizia.it";
@@ -49,10 +50,111 @@ export const minIntervalMs = (): number => {
   return Math.max(FLOOR_MIN_INTERVAL_MS, parsed);
 };
 
-/** Per-user folder for the session file and the dedicated browser profile. */
-export const appDir = (): string => {
-  const override = envValue("BDM_HOME");
-  if (override) return override;
+const OFF = new Set(["off", "false", "0", "no"]);
+const ON = new Set(["on", "true", "1", "yes", "si", "sì"]);
+
+/**
+ * Whether the tools and fields that expose the user's personal area (folders,
+ * saved searches, personal notes) are offered to the model. On by default;
+ * `BDM_PERSONAL_AREA=off` keeps that data away from the AI provider.
+ */
+export const personalAreaEnabled = (): boolean => {
+  const raw = envValue("BDM_PERSONAL_AREA")?.toLowerCase();
+  if (raw === undefined || ON.has(raw)) return true;
+  if (OFF.has(raw)) return false;
+  throw new Error(`BDM_PERSONAL_AREA deve essere "on" oppure "off": ${raw}`);
+};
+
+/**
+ * The real location of `path`, following symlinks and Windows junctions: the
+ * nearest existing ancestor is resolved by the filesystem and the missing tail
+ * is appended. Without this, a link pointing into a synced folder would pass.
+ */
+const canonical = (path: string): string => {
+  let existing = resolve(path);
+  const tail: string[] = [];
+  for (;;) {
+    try {
+      return join(realpathSync.native(existing), ...tail);
+    } catch {
+      const parent = dirname(existing);
+      if (parent === existing) return resolve(path);
+      tail.unshift(basename(existing));
+      existing = parent;
+    }
+  }
+};
+
+/** True when `path` is `folder` or below it (on Windows `relative` ignores case). */
+const isInside = (path: string, folder: string): boolean => {
+  const rel = relative(folder, path);
+  return rel === "" || (rel !== ".." && !rel.startsWith(`..${sep}`) && !isAbsolute(rel));
+};
+
+/**
+ * The Dropbox folders the desktop client is configured with, wherever the user
+ * moved them (e.g. `D:\Dropbox`). Dropbox documents `info.json` for this:
+ * `{"personal": {"path": ...}, "business": {"path": ...}}`.
+ */
+const dropboxRoots = (): string[] => {
+  const candidates = [
+    process.env.APPDATA && join(process.env.APPDATA, "Dropbox", "info.json"),
+    process.env.LOCALAPPDATA && join(process.env.LOCALAPPDATA, "Dropbox", "info.json"),
+    join(homedir(), ".dropbox", "info.json"),
+  ].filter((file): file is string => Boolean(file));
+  const roots: string[] = [];
+  for (const file of candidates) {
+    try {
+      const accounts: unknown = JSON.parse(readFileSync(file, "utf8"));
+      if (!accounts || typeof accounts !== "object") continue;
+      for (const account of Object.values(accounts)) {
+        const path: unknown = account && typeof account === "object" ? (account as { path?: unknown }).path : undefined;
+        if (typeof path === "string" && isAbsolute(path)) roots.push(path);
+      }
+    } catch {
+      // No Dropbox, or a file we cannot read: nothing to add.
+    }
+  }
+  return roots;
+};
+
+/** Folders whose content a sync client copies to someone else's servers. */
+const syncedFolders = (): string[] => {
+  const home = homedir();
+  const fromEnv = ["OneDrive", "OneDriveCommercial", "OneDriveConsumer"]
+    .map((name) => process.env[name]?.trim())
+    .filter((value): value is string => Boolean(value));
+  return [
+    ...fromEnv,
+    ...dropboxRoots(),
+    join(home, "OneDrive"),
+    join(home, "Dropbox"),
+    join(home, "Google Drive"),
+    join(home, "iCloudDrive"),
+    join(home, "Library", "CloudStorage"),
+    join(home, "Library", "Mobile Documents"),
+  ];
+};
+
+/**
+ * Root folders that Google Drive for desktop creates wherever it streams or
+ * mirrors (the `G:` drive by default on Windows, or a folder the user picks),
+ * in English and Italian. Matched as any path segment, ignoring case.
+ */
+const DRIVE_ROOT_NAMES = new Set(["my drive", "il mio drive", "shared drives", "drive condivisi", "google drive"]);
+
+/** The synced folder that contains `path`, if any. */
+export const syncedFolderOf = (path: string): string | undefined => {
+  const real = canonical(path);
+  const known = syncedFolders().find((folder) => isInside(real, canonical(folder)));
+  if (known) return known;
+  const segments = real.split(/[\\/]/);
+  const drive = segments.findIndex((segment) => DRIVE_ROOT_NAMES.has(segment.toLowerCase()));
+  return drive === -1 ? undefined : segments.slice(0, drive + 1).join(sep);
+};
+
+/** The platform's per-user data folder, used when `BDM_HOME` is unset. */
+const defaultAppDir = (): string => {
   switch (process.platform) {
     case "darwin":
       return join(homedir(), "Library", "Application Support", APP_NAME);
@@ -63,8 +165,45 @@ export const appDir = (): string => {
   }
 };
 
-export const sessionFile = (): string => join(appDir(), "sessione.json");
-export const browserProfileDir = (): string => join(appDir(), "browser-profile");
+/**
+ * Per-user folder for the session file and the dedicated browser profile.
+ * Both an explicit `BDM_HOME` and the computed default are checked: the default
+ * can land in a synced folder too (`XDG_CONFIG_HOME`, `APPDATA`, a symlinked `~/.config`).
+ */
+export const appDir = (): string => {
+  const override = envValue("BDM_HOME");
+  const dir = configuredAppDir();
+  // The session file is a live login: in a synced folder it would leave the computer.
+  const synced = syncedFolderOf(dir);
+  if (synced) {
+    const what = override ? `BDM_HOME (${dir})` : `La cartella dati predefinita (${dir})`;
+    const fix = override ? "Scegli una cartella locale." : "Imposta BDM_HOME su una cartella locale.";
+    throw new BdpError(
+      "parametri",
+      `${what} è dentro una cartella sincronizzata (${synced}): la sessione uscirebbe dal computer. ${fix}`,
+    );
+  }
+  return dir;
+};
+
+/** The configured data folder, without the synced-folder check. */
+const configuredAppDir = (): string => envValue("BDM_HOME") ?? defaultAppDir();
+
+const SESSION_FILE = "sessione.json";
+const BROWSER_PROFILE = "browser-profile";
+
+export const sessionFile = (): string => join(appDir(), SESSION_FILE);
+export const browserProfileDir = (): string => join(appDir(), BROWSER_PROFILE);
+
+/**
+ * Where the session and profile are stored, without the synced-folder check.
+ * Only for deleting them: logout must still work when an older version or a
+ * manual setting already put them in a folder that is now refused.
+ */
+export const storedPaths = (): { session: string; profile: string } => {
+  const dir = configuredAppDir();
+  return { session: join(dir, SESSION_FILE), profile: join(dir, BROWSER_PROFILE) };
+};
 
 export const downloadDir = (): string => {
   const configured = envValue("BDM_DOWNLOAD_DIR");
