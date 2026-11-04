@@ -161,6 +161,25 @@ describe("configuration from clients", () => {
     }
   });
 
+  it("recognises a Dropbox folder moved elsewhere, from Dropbox's info.json", async () => {
+    const root = await mkdtemp(join(tmpdir(), "bdm-moved-dropbox-"));
+    const moved = join(root, "D", "Dropbox (Studio)");
+    await mkdir(join(root, "appdata", "Dropbox"), { recursive: true });
+    await writeFile(join(root, "appdata", "Dropbox", "info.json"), JSON.stringify({ business: { path: moved } }));
+    const previousHome = process.env.BDM_HOME;
+    try {
+      withEnv("APPDATA", join(root, "appdata"), () => {
+        process.env.BDM_HOME = join(moved, "bdm");
+        assert.throws(() => appDir(), isCode("parametri"));
+        process.env.BDM_HOME = join(root, "D", "locale");
+        assert.equal(appDir(), join(root, "D", "locale"));
+      });
+    } finally {
+      if (previousHome === undefined) delete process.env.BDM_HOME;
+      else process.env.BDM_HOME = previousHome;
+    }
+  });
+
   it("checks the default folder too when BDM_HOME is unset", { skip: process.platform !== "linux" }, async () => {
     const synced = await mkdtemp(join(tmpdir(), "bdm-dropbox-"));
     const previousHome = process.env.BDM_HOME;
@@ -201,6 +220,25 @@ describe("logout", { skip: process.platform === "win32" }, () => {
     const profile = await mkdtemp(join(tmpdir(), "bdm-profile-"));
     await symlink(`${hostname()}-2147483646`, join(profile, "SingletonLock"));
     assert.equal(await profileInUse(profile), false);
+  });
+
+  it("still deletes a session already stored in a folder that is now refused", async () => {
+    const synced = await mkdtemp(join(tmpdir(), "bdm-onedrive-"));
+    const previous = { home: process.env.BDM_HOME, onedrive: process.env.OneDrive };
+    try {
+      process.env.OneDrive = synced;
+      process.env.BDM_HOME = join(synced, "bdm");
+      await mkdir(join(synced, "bdm", "browser-profile"), { recursive: true });
+      await writeFile(join(synced, "bdm", "sessione.json"), "{}");
+      assert.throws(() => sessionFile(), isCode("parametri"));
+      await logout();
+      await assert.rejects(access(join(synced, "bdm", "sessione.json")));
+      await assert.rejects(access(join(synced, "bdm", "browser-profile")));
+    } finally {
+      process.env.BDM_HOME = previous.home;
+      if (previous.onedrive === undefined) delete process.env.OneDrive;
+      else process.env.OneDrive = previous.onedrive;
+    }
   });
 
   it("refuses to log out while a login window is open, and keeps the session", async () => {

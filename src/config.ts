@@ -1,4 +1,4 @@
-import { realpathSync } from "node:fs";
+import { readFileSync, realpathSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { BdpError } from "./errors.ts";
@@ -91,6 +91,33 @@ const isInside = (path: string, folder: string): boolean => {
   return rel === "" || (rel !== ".." && !rel.startsWith(`..${sep}`) && !isAbsolute(rel));
 };
 
+/**
+ * The Dropbox folders the desktop client is configured with, wherever the user
+ * moved them (e.g. `D:\Dropbox`). Dropbox documents `info.json` for this:
+ * `{"personal": {"path": ...}, "business": {"path": ...}}`.
+ */
+const dropboxRoots = (): string[] => {
+  const candidates = [
+    process.env.APPDATA && join(process.env.APPDATA, "Dropbox", "info.json"),
+    process.env.LOCALAPPDATA && join(process.env.LOCALAPPDATA, "Dropbox", "info.json"),
+    join(homedir(), ".dropbox", "info.json"),
+  ].filter((file): file is string => Boolean(file));
+  const roots: string[] = [];
+  for (const file of candidates) {
+    try {
+      const accounts: unknown = JSON.parse(readFileSync(file, "utf8"));
+      if (!accounts || typeof accounts !== "object") continue;
+      for (const account of Object.values(accounts)) {
+        const path: unknown = account && typeof account === "object" ? (account as { path?: unknown }).path : undefined;
+        if (typeof path === "string" && isAbsolute(path)) roots.push(path);
+      }
+    } catch {
+      // No Dropbox, or a file we cannot read: nothing to add.
+    }
+  }
+  return roots;
+};
+
 /** Folders whose content a sync client copies to someone else's servers. */
 const syncedFolders = (): string[] => {
   const home = homedir();
@@ -99,6 +126,7 @@ const syncedFolders = (): string[] => {
     .filter((value): value is string => Boolean(value));
   return [
     ...fromEnv,
+    ...dropboxRoots(),
     join(home, "OneDrive"),
     join(home, "Dropbox"),
     join(home, "Google Drive"),
@@ -144,7 +172,7 @@ const defaultAppDir = (): string => {
  */
 export const appDir = (): string => {
   const override = envValue("BDM_HOME");
-  const dir = override ?? defaultAppDir();
+  const dir = configuredAppDir();
   // The session file is a live login: in a synced folder it would leave the computer.
   const synced = syncedFolderOf(dir);
   if (synced) {
@@ -158,8 +186,24 @@ export const appDir = (): string => {
   return dir;
 };
 
-export const sessionFile = (): string => join(appDir(), "sessione.json");
-export const browserProfileDir = (): string => join(appDir(), "browser-profile");
+/** The configured data folder, without the synced-folder check. */
+const configuredAppDir = (): string => envValue("BDM_HOME") ?? defaultAppDir();
+
+const SESSION_FILE = "sessione.json";
+const BROWSER_PROFILE = "browser-profile";
+
+export const sessionFile = (): string => join(appDir(), SESSION_FILE);
+export const browserProfileDir = (): string => join(appDir(), BROWSER_PROFILE);
+
+/**
+ * Where the session and profile are stored, without the synced-folder check.
+ * Only for deleting them: logout must still work when an older version or a
+ * manual setting already put them in a folder that is now refused.
+ */
+export const storedPaths = (): { session: string; profile: string } => {
+  const dir = configuredAppDir();
+  return { session: join(dir, SESSION_FILE), profile: join(dir, BROWSER_PROFILE) };
+};
 
 export const downloadDir = (): string => {
   const configured = envValue("BDM_DOWNLOAD_DIR");

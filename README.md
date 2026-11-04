@@ -143,7 +143,7 @@ protegge anche il tuo account.
 |---|---|---|
 | `BDM_DOWNLOAD_DIR` | `~/Downloads/banca-dati-merito` | Dove `scarica_documento` salva i PDF |
 | `BDM_MIN_INTERVAL_MS` | `1000` | Pausa minima tra due richieste (mai sotto 250) |
-| `BDM_HOME` | cartella dati del sistema | Dove salvare sessione e profilo del browser. Protezione di base: rifiutata se è dentro OneDrive, Dropbox, Google Drive o iCloud (vale anche per la cartella predefinita). Altri servizi di sincronizzazione (Box, pCloud, Nextcloud…) non vengono riconosciuti: scegli comunque una cartella locale |
+| `BDM_HOME` | cartella dati del sistema | Dove salvare sessione e profilo del browser. Protezione di base: rifiutata se è dentro OneDrive, Dropbox, Google Drive o iCloud (vale anche per la cartella predefinita e per una cartella Dropbox spostata altrove). `esci` funziona comunque, così una sessione già salvata lì si può cancellare. Altri servizi di sincronizzazione (Box, pCloud, Nextcloud…) non vengono riconosciuti: scegli comunque una cartella locale |
 | `BDM_PERSONAL_AREA` | `on` | `off` nasconde all'assistente cartelle personali, ricerche salvate e note personali |
 
 ## Come funziona

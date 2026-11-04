@@ -1,10 +1,9 @@
 import { readlink, rm } from "node:fs/promises";
 import { hostname } from "node:os";
 import { join } from "node:path";
-import { browserProfileDir } from "../config.ts";
+import { storedPaths } from "../config.ts";
 import { BdpError } from "../errors.ts";
 import { loginInProgress } from "./login.ts";
-import { clearSession } from "./store.ts";
 
 const errorCode = (error: unknown): string | undefined =>
   error instanceof Error && "code" in error && typeof error.code === "string" ? error.code : undefined;
@@ -25,7 +24,7 @@ const isAlive = (pid: number): boolean => {
  * symlink to "<host>-<pid>", on macOS and Linux, and with a `lockfile` it keeps
  * open, so it cannot be deleted, on Windows. A lock left by a crash is ignored.
  */
-export const profileInUse = async (profile = browserProfileDir()): Promise<boolean> => {
+export const profileInUse = async (profile = storedPaths().profile): Promise<boolean> => {
   if (process.platform === "win32") {
     try {
       await rm(join(profile, "lockfile"), { force: true });
@@ -54,13 +53,16 @@ const LOGIN_OPEN =
   "È aperta una finestra di accesso alla Banca Dati (forse da un'altra app che usa questo server): completa l'accesso o chiudi la finestra, poi riprova a uscire.";
 
 /**
- * Deletes the session file and the dedicated browser profile. The profile holds
+ * Deletes the session file and the dedicated browser profile, even from a
+ * folder the synced-folder check now refuses. The profile holds
  * BDP and identity-provider cookies too: keeping it would let the next login
  * skip authentication. Refuses while a login window is open, in this process or
  * another, because that login would save a new session right after.
  */
 export const logout = async (): Promise<void> => {
-  if (loginInProgress() || (await profileInUse())) throw new BdpError("parametri", LOGIN_OPEN);
-  await clearSession();
-  await rm(browserProfileDir(), { recursive: true, force: true });
+  // Unchecked paths: credentials already stored in a synced folder must still be removable.
+  const { session, profile } = storedPaths();
+  if (loginInProgress() || (await profileInUse(profile))) throw new BdpError("parametri", LOGIN_OPEN);
+  await rm(session, { force: true });
+  await rm(profile, { recursive: true, force: true });
 };
