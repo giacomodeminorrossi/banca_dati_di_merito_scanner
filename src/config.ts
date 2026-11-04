@@ -108,10 +108,21 @@ const syncedFolders = (): string[] => {
   ];
 };
 
+/**
+ * Root folders that Google Drive for desktop creates wherever it streams or
+ * mirrors (the `G:` drive by default on Windows, or a folder the user picks),
+ * in English and Italian. Matched as any path segment, ignoring case.
+ */
+const DRIVE_ROOT_NAMES = new Set(["my drive", "il mio drive", "shared drives", "drive condivisi", "google drive"]);
+
 /** The synced folder that contains `path`, if any. */
 export const syncedFolderOf = (path: string): string | undefined => {
   const real = canonical(path);
-  return syncedFolders().find((folder) => isInside(real, canonical(folder)));
+  const known = syncedFolders().find((folder) => isInside(real, canonical(folder)));
+  if (known) return known;
+  const segments = real.split(/[\\/]/);
+  const drive = segments.findIndex((segment) => DRIVE_ROOT_NAMES.has(segment.toLowerCase()));
+  return drive === -1 ? undefined : segments.slice(0, drive + 1).join(sep);
 };
 
 /** The platform's per-user data folder, used when `BDM_HOME` is unset. */

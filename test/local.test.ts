@@ -145,6 +145,22 @@ describe("configuration from clients", () => {
       else process.env.BDM_HOME = previousHome;
     }
   });
+  it("recognises Google Drive for desktop wherever it is mounted", async () => {
+    const root = await mkdtemp(join(tmpdir(), "bdm-gdrive-"));
+    const previousHome = process.env.BDM_HOME;
+    try {
+      for (const folder of ["My Drive", "il mio drive", "Shared drives"]) {
+        process.env.BDM_HOME = join(root, "G", folder, "bdm");
+        assert.throws(() => appDir(), isCode("parametri"));
+      }
+      process.env.BDM_HOME = join(root, "My Drivers", "bdm");
+      assert.equal(appDir(), join(root, "My Drivers", "bdm"));
+    } finally {
+      if (previousHome === undefined) delete process.env.BDM_HOME;
+      else process.env.BDM_HOME = previousHome;
+    }
+  });
+
   it("checks the default folder too when BDM_HOME is unset", { skip: process.platform !== "linux" }, async () => {
     const synced = await mkdtemp(join(tmpdir(), "bdm-dropbox-"));
     const previousHome = process.env.BDM_HOME;
