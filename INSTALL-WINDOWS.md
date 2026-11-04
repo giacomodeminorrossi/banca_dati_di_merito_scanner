@@ -1,8 +1,8 @@
-# Installing on Windows (reviewed commit `bb90888`)
+# Installing on Windows (commit `905067f`)
 
-These steps install exactly the reviewed code: commit
-`bb90888695b1f035e67e1859b867dcadfa2192f4`, with dependencies taken from its lockfile.
-Run every command in **PowerShell** (not as Administrator).
+These steps install commit `905067fb9331ad3532979e560ce60067b26cc696`: the reviewed upstream code
+(`bb90888`, v0.1.2) plus the improvements listed in `SECURITY-REVIEW.md`, with dependencies
+taken from the lockfile. Run every command in **PowerShell** (not as Administrator).
 
 ## 1. Prerequisites
 
@@ -45,14 +45,14 @@ cd banca-dati-merito-mcp
 ```
 
 ```powershell
-git checkout --detach bb90888695b1f035e67e1859b867dcadfa2192f4
+git checkout --detach 905067fb9331ad3532979e560ce60067b26cc696
 ```
 
 ```powershell
 git rev-parse HEAD
 ```
 
-The last command must print `bb90888695b1f035e67e1859b867dcadfa2192f4`. Then install the locked
+The last command must print `905067fb9331ad3532979e560ce60067b26cc696`. Then install the locked
 dependencies (no install scripts) and compile:
 
 ```powershell
@@ -60,14 +60,16 @@ npm ci --ignore-scripts --no-fund
 ```
 
 ```powershell
-.\node_modules\.bin\tsc.cmd -p tsconfig.build.json
+npm run build
 ```
 
 ```powershell
 node dist\cli.js --help
 ```
 
-Don't use `npm run build`: it calls `rm -rf`, which doesn't exist on Windows.
+To install the unmodified upstream code instead, check out
+`bb90888695b1f035e67e1859b867dcadfa2192f4`. There `npm run build` fails on Windows (it calls
+`rm -rf`), so compile with `.\node_modules\.bin\tsc.cmd -p tsconfig.build.json`.
 
 ## 3. Sign in once (optional but recommended)
 
@@ -108,7 +110,8 @@ right file even for the Microsoft Store build. Normally it's
       "command": "C:\\Program Files\\nodejs\\node.exe",
       "args": ["C:\\Users\\YOURNAME\\banca-dati-merito-mcp\\dist\\cli.js"],
       "env": {
-        "BDM_DOWNLOAD_DIR": "C:\\Users\\YOURNAME\\Downloads\\banca-dati-merito"
+        "BDM_DOWNLOAD_DIR": "C:\\Users\\YOURNAME\\Downloads\\banca-dati-merito",
+        "BDM_PERSONAL_AREA": "off"
       }
     }
   }
@@ -116,20 +119,23 @@ right file even for the Microsoft Store build. Normally it's
 ```
 
 No `cmd /c` wrapper is needed, because this runs `node.exe` directly rather than `npx`. `env` is
-optional; the value shown is the default. Fully quit Claude Desktop (tray icon → Quit) and reopen
+optional. `BDM_DOWNLOAD_DIR` shows the default. `BDM_PERSONAL_AREA` set to `off` keeps your BDP
+folders, saved searches and notes away from the AI; remove it, or set it to `on`, if you want
+the assistant to use them. Fully quit Claude Desktop (tray icon → Quit) and reopen
 it.
 
 ## 5. Claude Code
 
 ```powershell
-claude mcp add --scope user banca-dati-merito -- node "$env:USERPROFILE\banca-dati-merito-mcp\dist\cli.js"
+claude mcp add --scope user -e BDM_PERSONAL_AREA=off banca-dati-merito -- node "$env:USERPROFILE\banca-dati-merito-mcp\dist\cli.js"
 ```
 
 ```powershell
 claude mcp list
 ```
 
-`banca-dati-merito` should show as connected. Inside a session, `/mcp` lists its 19 tools. Don't
+`banca-dati-merito` should show as connected. Inside a session, `/mcp` lists its tools: 17 with
+`BDM_PERSONAL_AREA=off`, 20 without it. Don't
 use the upstream `/plugin marketplace add andreadorizza/...`: it runs `npx` against unpinned
 dependencies.
 
@@ -153,10 +159,10 @@ Copy-Item -Recurse .\skills\ricerca-banca-dati-merito "$env:USERPROFILE\.claude\
 2. Ask for a small search, for example: *"Cerca 3 provvedimenti del Tribunale di Bologna sull'usucapione."*
 3. If the tools don't appear in Claude Desktop, read `%APPDATA%\Claude\logs\mcp-server-banca-dati-merito.log`.
 
-Recommended hardening, from `SECURITY-REVIEW.md`: in Claude Desktop's tool menu, turn off
-`cartelle_personali`, `leggi_cartella_personale` and `ricerche_salvate` if you don't want your BDP
-notes sent to the AI. Keep approval on for `accedi` and `scarica_documento`. Run
-`node dist\cli.js logout` when you finish working.
+Recommended hardening, from `SECURITY-REVIEW.md`: keep `BDM_PERSONAL_AREA` set to `off` unless
+you need your BDP folders and notes in the chat. Keep approval on for `accedi`, `esci` and
+`scarica_documento`. When you finish working, ask Claude to use `esci`, or run
+`node dist\cli.js logout`.
 
 ## 8. Uninstall
 
