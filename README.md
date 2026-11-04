@@ -143,7 +143,7 @@ protegge anche il tuo account.
 |---|---|---|
 | `BDM_DOWNLOAD_DIR` | `~/Downloads/banca-dati-merito` | Dove `scarica_documento` salva i PDF |
 | `BDM_MIN_INTERVAL_MS` | `1000` | Pausa minima tra due richieste (mai sotto 250) |
-| `BDM_HOME` | cartella dati del sistema | Dove salvare sessione e profilo del browser. Rifiutata se è dentro OneDrive, Dropbox, Google Drive o iCloud |
+| `BDM_HOME` | cartella dati del sistema | Dove salvare sessione e profilo del browser. Rifiutata se è dentro OneDrive, Dropbox, Google Drive o iCloud (vale anche per la cartella predefinita) |
 | `BDM_PERSONAL_AREA` | `on` | `off` nasconde all'assistente cartelle personali, ricerche salvate e note personali |
 
 ## Come funziona

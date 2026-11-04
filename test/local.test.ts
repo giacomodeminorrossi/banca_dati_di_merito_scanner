@@ -145,6 +145,23 @@ describe("configuration from clients", () => {
       else process.env.BDM_HOME = previousHome;
     }
   });
+  it("checks the default folder too when BDM_HOME is unset", { skip: process.platform !== "linux" }, async () => {
+    const synced = await mkdtemp(join(tmpdir(), "bdm-dropbox-"));
+    const previousHome = process.env.BDM_HOME;
+    delete process.env.BDM_HOME;
+    try {
+      withEnv("OneDrive", synced, () => {
+        withEnv("XDG_CONFIG_HOME", join(synced, "config"), () => {
+          assert.throws(() => appDir(), isCode("parametri"));
+        });
+        withEnv("XDG_CONFIG_HOME", `${synced}-altro`, () => {
+          assert.equal(appDir(), join(`${synced}-altro`, "banca-dati-merito-mcp"));
+        });
+      });
+    } finally {
+      if (previousHome !== undefined) process.env.BDM_HOME = previousHome;
+    }
+  });
 });
 
 describe("logout", { skip: process.platform === "win32" }, () => {

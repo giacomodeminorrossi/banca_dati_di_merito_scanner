@@ -114,20 +114,8 @@ export const syncedFolderOf = (path: string): string | undefined => {
   return syncedFolders().find((folder) => isInside(real, canonical(folder)));
 };
 
-/** Per-user folder for the session file and the dedicated browser profile. */
-export const appDir = (): string => {
-  const override = envValue("BDM_HOME");
-  if (override) {
-    // The session file is a live login: in a synced folder it would leave the computer.
-    const synced = syncedFolderOf(override);
-    if (synced) {
-      throw new BdpError(
-        "parametri",
-        `BDM_HOME (${override}) è dentro una cartella sincronizzata (${synced}): la sessione uscirebbe dal computer. Scegli una cartella locale.`,
-      );
-    }
-    return override;
-  }
+/** The platform's per-user data folder, used when `BDM_HOME` is unset. */
+const defaultAppDir = (): string => {
   switch (process.platform) {
     case "darwin":
       return join(homedir(), "Library", "Application Support", APP_NAME);
@@ -136,6 +124,27 @@ export const appDir = (): string => {
     default:
       return join(process.env.XDG_CONFIG_HOME ?? join(homedir(), ".config"), APP_NAME);
   }
+};
+
+/**
+ * Per-user folder for the session file and the dedicated browser profile.
+ * Both an explicit `BDM_HOME` and the computed default are checked: the default
+ * can land in a synced folder too (`XDG_CONFIG_HOME`, `APPDATA`, a symlinked `~/.config`).
+ */
+export const appDir = (): string => {
+  const override = envValue("BDM_HOME");
+  const dir = override ?? defaultAppDir();
+  // The session file is a live login: in a synced folder it would leave the computer.
+  const synced = syncedFolderOf(dir);
+  if (synced) {
+    const what = override ? `BDM_HOME (${dir})` : `La cartella dati predefinita (${dir})`;
+    const fix = override ? "Scegli una cartella locale." : "Imposta BDM_HOME su una cartella locale.";
+    throw new BdpError(
+      "parametri",
+      `${what} è dentro una cartella sincronizzata (${synced}): la sessione uscirebbe dal computer. ${fix}`,
+    );
+  }
+  return dir;
 };
 
 export const sessionFile = (): string => join(appDir(), "sessione.json");
