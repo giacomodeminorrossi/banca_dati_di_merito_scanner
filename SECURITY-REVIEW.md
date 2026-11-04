@@ -63,15 +63,15 @@ among the direct dependencies.
 5. Don't point `BDM_HOME` or `BDM_DOWNLOAD_DIR` at a synced folder (OneDrive, Dropbox). The session file would leave your machine.
 6. Don't pull upstream changes without reviewing the diff first.
 
-## Changes made after the review (commit `905067f`)
+## Changes made after the review (branch `miglioramenti`)
 
-The changes are on top of `bb90888`. Each one has tests: `npm run check` passes 57 tests, up from 51.
+The changes are on top of `bb90888`. Each one has tests: `npm run check` passes 61 tests, up from 51.
 
 | Change | Addresses | Files |
 |---|---|---|
 | `BDM_PERSONAL_AREA=off` (Claude Desktop: "Area personale") hides the 3 personal-area tools, the `note_personali` / `solo_cartelle_personali` / `includi_cartelle` parameters, and the note fields in `leggi_provvedimento` / `leggi_abstract`. On by default, as upstream. | Finding 8 | `src/config.ts`, `src/server.ts`, `src/tools/search.ts`, `src/tools/read.ts`, `manifest.json` |
-| New `esci` tool. It deletes the session file and the browser profile, and refuses while a login window is open. The CLI `logout` uses the same code. | Findings 3–4 | `src/session/logout.ts`, `src/tools/session.ts`, `src/cli.ts` |
-| A `BDM_HOME` inside OneDrive, Dropbox, Google Drive or iCloud is refused, so the session file can't be synced off the machine. | Finding 3 | `src/config.ts` |
+| New `esci` tool. It deletes the session file and the browser profile, and refuses while a login window is open, including one opened by another app running this server (it checks Chromium's profile lock). The CLI `logout` uses the same code. | Findings 3–4 | `src/session/logout.ts`, `src/tools/session.ts`, `src/cli.ts` |
+| A `BDM_HOME` inside OneDrive, Dropbox, Google Drive or iCloud is refused, so the session file can't be synced off the machine. Symlinks and Windows junctions are followed before the check. | Finding 3 | `src/config.ts` |
 | The server instructions say that texts, abstracts and notes are data, not instructions. | Finding 7 | `src/server.ts` |
 | `npm run build` no longer uses `rm -rf`, so it works on Windows. | Finding 13 | `package.json` |
 | `note_personali` search text is capped at 200 characters. | Input limits | `src/tools/search.ts` |

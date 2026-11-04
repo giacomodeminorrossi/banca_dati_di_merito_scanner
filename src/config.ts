@@ -1,5 +1,6 @@
+import { realpathSync } from "node:fs";
 import { homedir } from "node:os";
-import { isAbsolute, join, relative, resolve, sep } from "node:path";
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { BdpError } from "./errors.ts";
 
 export const BDP_HOST = "bdp.giustizia.it";
@@ -64,9 +65,29 @@ export const personalAreaEnabled = (): boolean => {
   throw new Error(`BDM_PERSONAL_AREA deve essere "on" oppure "off": ${raw}`);
 };
 
+/**
+ * The real location of `path`, following symlinks and Windows junctions: the
+ * nearest existing ancestor is resolved by the filesystem and the missing tail
+ * is appended. Without this, a link pointing into a synced folder would pass.
+ */
+const canonical = (path: string): string => {
+  let existing = resolve(path);
+  const tail: string[] = [];
+  for (;;) {
+    try {
+      return join(realpathSync.native(existing), ...tail);
+    } catch {
+      const parent = dirname(existing);
+      if (parent === existing) return resolve(path);
+      tail.unshift(basename(existing));
+      existing = parent;
+    }
+  }
+};
+
 /** True when `path` is `folder` or below it (on Windows `relative` ignores case). */
 const isInside = (path: string, folder: string): boolean => {
-  const rel = relative(resolve(folder), resolve(path));
+  const rel = relative(folder, path);
   return rel === "" || (rel !== ".." && !rel.startsWith(`..${sep}`) && !isAbsolute(rel));
 };
 
@@ -88,8 +109,10 @@ const syncedFolders = (): string[] => {
 };
 
 /** The synced folder that contains `path`, if any. */
-export const syncedFolderOf = (path: string): string | undefined =>
-  syncedFolders().find((folder) => isInside(path, folder));
+export const syncedFolderOf = (path: string): string | undefined => {
+  const real = canonical(path);
+  return syncedFolders().find((folder) => isInside(real, canonical(folder)));
+};
 
 /** Per-user folder for the session file and the dedicated browser profile. */
 export const appDir = (): string => {

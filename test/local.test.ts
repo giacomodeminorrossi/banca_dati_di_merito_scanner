@@ -1,12 +1,13 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, stat, writeFile } from "node:fs/promises";
-import { homedir, tmpdir } from "node:os";
+import { access, mkdir, mkdtemp, readFile, stat, symlink, writeFile } from "node:fs/promises";
+import { homedir, hostname, tmpdir } from "node:os";
 import { join } from "node:path";
 import { before, describe, it } from "node:test";
 import { z } from "zod";
 import { request } from "../src/bdp/http.ts";
-import { appDir, downloadDir, minIntervalMs, personalAreaEnabled, sessionFile } from "../src/config.ts";
+import { appDir, browserProfileDir, downloadDir, minIntervalMs, personalAreaEnabled, sessionFile } from "../src/config.ts";
 import { BdpError } from "../src/errors.ts";
+import { logout, profileInUse } from "../src/session/logout.ts";
 import { loadSession, saveSession, type Session } from "../src/session/store.ts";
 import { safeFileName } from "../src/tools/read.ts";
 
@@ -126,5 +127,53 @@ describe("configuration from clients", () => {
       if (previousHome === undefined) delete process.env.BDM_HOME;
       else process.env.BDM_HOME = previousHome;
     }
+  });
+
+  it("follows symlinks before deciding a folder is not synced", { skip: process.platform === "win32" }, async () => {
+    const root = await mkdtemp(join(tmpdir(), "bdm-link-"));
+    const synced = join(root, "Dropbox");
+    await mkdir(synced);
+    await symlink(synced, join(root, "local-data"));
+    const previousHome = process.env.BDM_HOME;
+    try {
+      withEnv("OneDrive", synced, () => {
+        process.env.BDM_HOME = join(root, "local-data", "bdm");
+        assert.throws(() => appDir(), isCode("parametri"));
+      });
+    } finally {
+      if (previousHome === undefined) delete process.env.BDM_HOME;
+      else process.env.BDM_HOME = previousHome;
+    }
+  });
+});
+
+describe("logout", { skip: process.platform === "win32" }, () => {
+  before(async () => {
+    process.env.BDM_HOME = await mkdtemp(join(tmpdir(), "bdm-logout-"));
+  });
+
+  const lockProfile = async (pid: number): Promise<void> => {
+    await mkdir(browserProfileDir(), { recursive: true });
+    await symlink(`${hostname()}-${pid}`, join(browserProfileDir(), "SingletonLock"));
+  };
+
+  it("sees a browser that another process has open on the profile", async () => {
+    const profile = await mkdtemp(join(tmpdir(), "bdm-profile-"));
+    assert.equal(await profileInUse(profile), false);
+    await symlink(`${hostname()}-${process.pid}`, join(profile, "SingletonLock"));
+    assert.equal(await profileInUse(profile), true);
+  });
+
+  it("ignores the lock a crashed browser left behind", async () => {
+    const profile = await mkdtemp(join(tmpdir(), "bdm-profile-"));
+    await symlink(`${hostname()}-2147483646`, join(profile, "SingletonLock"));
+    assert.equal(await profileInUse(profile), false);
+  });
+
+  it("refuses to log out while a login window is open, and keeps the session", async () => {
+    await saveSession(SESSION);
+    await lockProfile(process.pid);
+    await assert.rejects(logout(), isCode("parametri"));
+    await access(sessionFile());
   });
 });
