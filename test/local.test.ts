@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { before, describe, it } from "node:test";
 import { z } from "zod";
 import { request } from "../src/bdp/http.ts";
-import { downloadDir, minIntervalMs, sessionFile } from "../src/config.ts";
+import { appDir, downloadDir, minIntervalMs, personalAreaEnabled, sessionFile } from "../src/config.ts";
 import { BdpError } from "../src/errors.ts";
 import { loadSession, saveSession, type Session } from "../src/session/store.ts";
 import { safeFileName } from "../src/tools/read.ts";
@@ -102,5 +102,29 @@ describe("configuration from clients", () => {
 
   it("rejects a relative download folder instead of writing under the client's working directory", () => {
     assert.throws(() => withEnv("BDM_DOWNLOAD_DIR", "Downloads/pdf", downloadDir), isCode("parametri"));
+  });
+
+  it("reads the personal-area switch as Claude Desktop passes it", () => {
+    assert.equal(withEnv("BDM_PERSONAL_AREA", "${user_config.personal_area}", personalAreaEnabled), true);
+    assert.equal(withEnv("BDM_PERSONAL_AREA", "true", personalAreaEnabled), true);
+    assert.equal(withEnv("BDM_PERSONAL_AREA", "false", personalAreaEnabled), false);
+    assert.equal(withEnv("BDM_PERSONAL_AREA", "OFF", personalAreaEnabled), false);
+    assert.throws(() => withEnv("BDM_PERSONAL_AREA", "forse", personalAreaEnabled));
+  });
+
+  it("refuses to keep the session in a cloud-synced folder", async () => {
+    const synced = await mkdtemp(join(tmpdir(), "bdm-onedrive-"));
+    const previousHome = process.env.BDM_HOME;
+    try {
+      withEnv("OneDrive", synced, () => {
+        process.env.BDM_HOME = join(synced, "bdm");
+        assert.throws(() => appDir(), isCode("parametri"));
+        process.env.BDM_HOME = `${synced}-altro`;
+        assert.equal(appDir(), `${synced}-altro`);
+      });
+    } finally {
+      if (previousHome === undefined) delete process.env.BDM_HOME;
+      else process.env.BDM_HOME = previousHome;
+    }
   });
 });

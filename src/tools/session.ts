@@ -1,5 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { loginState, startLogin } from "../session/login.ts";
+import { logout } from "../session/logout.ts";
 import { checkSession } from "../session/status.ts";
 import { ok, run } from "./result.ts";
 
@@ -33,6 +34,22 @@ export const registerSessionTools = (server: McpServer): void => {
           istruzioni:
             "Si è aperta (o è già aperta) una finestra del browser sulla Banca Dati di Merito. L'utente deve completare l'accesso entro 5 minuti; poi usa stato_sessione per verificare.",
         });
+      }),
+  );
+
+  server.registerTool(
+    "esci",
+    {
+      title: "Esci dalla Banca Dati",
+      description:
+        "Chiude la sessione sul computer dell'utente: cancella il file di sessione e il profilo del browser dedicato (compresi i cookie dell'identità digitale). Usalo quando l'utente ha finito o chiede di uscire. Dopo, per cercare di nuovo servirà `accedi`.",
+      inputSchema: {},
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+    },
+    () =>
+      run(async () => {
+        await logout();
+        return ok({ esito: "Sessione e profilo del browser cancellati da questo computer." });
       }),
   );
 };

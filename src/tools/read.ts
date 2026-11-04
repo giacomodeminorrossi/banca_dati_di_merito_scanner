@@ -61,28 +61,41 @@ const writeUnique = async (dir: string, base: string, data: Buffer): Promise<str
   throw new BdpError("parametri", `Troppi file con il nome ${base} in ${dir}.`);
 };
 
-export const registerReadTools = (server: McpServer): void => {
+/** The personal-folders switch, offered only when the personal area is on. */
+const cartelleShape = (enabled: boolean, what: string): { includi_cartelle?: z.ZodDefault<z.ZodBoolean> } =>
+  enabled
+    ? {
+        includi_cartelle: z
+          .boolean()
+          .default(false)
+          .describe(`Aggiunge le cartelle personali dell'utente che contengono ${what}.`),
+      }
+    : {};
+
+const wantsCartelle = (args: object): boolean =>
+  "includi_cartelle" in args && args.includi_cartelle === true;
+
+export const registerReadTools = (server: McpServer, { personalArea }: { personalArea: boolean }): void => {
+  const notes = personalArea ? ", e le note personali dell'utente" : "";
   server.registerTool(
     "leggi_provvedimento",
     {
       title: "Leggi provvedimento",
       description:
-        "Restituisce i metadati completi di un provvedimento: estremi, giudici, materia, parole chiave, riferimenti normativi, esito, gli abstract che ne derivano, i provvedimenti precedente e successivo nel giudizio, e le note personali dell'utente.",
+        `Restituisce i metadati completi di un provvedimento: estremi, giudici, materia, parole chiave, riferimenti normativi, esito, gli abstract che ne derivano, i provvedimenti precedente e successivo nel giudizio${notes}.`,
       inputSchema: {
         id: idParam,
-        includi_cartelle: z
-          .boolean()
-          .default(false)
-          .describe("Aggiunge le cartelle personali dell'utente che contengono il provvedimento."),
+        ...cartelleShape(personalArea, "il provvedimento"),
         area: areaParam,
       },
       annotations: READ_ONLY,
     },
-    ({ id, includi_cartelle, area }, { signal }) =>
+    (args, { signal }) =>
       withBdp(signal, async (ctx) => {
+        const { id, area } = args;
         const item = await getProvvedimento(ctx, id, area);
         if (!item) throw notFound("provvedimento", id);
-        const cartelle = includi_cartelle ? await getCartelleDelDocumento(ctx, "provvedimenti", id) : undefined;
+        const cartelle = personalArea && wantsCartelle(args) ? await getCartelleDelDocumento(ctx, "provvedimenti", id) : undefined;
         return ok({
           ...estremi(item),
           distretto: item.distretto,
@@ -98,13 +111,17 @@ export const registerReadTools = (server: McpServer): void => {
           abstract: (item.abstract ?? []).map((a) => ({ ...estremi(a), titolo: a.titolo })),
           provvedimento_precedente: (item.provvedimento_precedente ?? []).map(estremi),
           provvedimento_successivo: (item.provvedimento_successivo ?? []).map(estremi),
-          note_personali: item.note,
-          note_sul_documento: (item.anonymized_document_note ?? []).map((note) => ({
-            testo: note.text,
-            pagina: note.page_number,
-            autore: [note.author?.name, note.author?.family_name].filter(Boolean).join(" ") || null,
-            aggiornata: note.last_update_date,
-          })),
+          ...(personalArea
+            ? {
+                note_personali: item.note,
+                note_sul_documento: (item.anonymized_document_note ?? []).map((note) => ({
+                  testo: note.text,
+                  pagina: note.page_number,
+                  autore: [note.author?.name, note.author?.family_name].filter(Boolean).join(" ") || null,
+                  aggiornata: note.last_update_date,
+                })),
+              }
+            : {}),
           ...(cartelle ? { cartelle_personali: cartelle } : {}),
         });
       }),
@@ -144,22 +161,20 @@ export const registerReadTools = (server: McpServer): void => {
     {
       title: "Leggi abstract",
       description:
-        "Restituisce un abstract completo: titolo, testo del principio, estremi del provvedimento da cui deriva, precedenti conformi e difformi collegati dalla Banca Dati, e le note personali dell'utente.",
+        `Restituisce un abstract completo: titolo, testo del principio, estremi del provvedimento da cui deriva, precedenti conformi e difformi collegati dalla Banca Dati${notes}.`,
       inputSchema: {
         id: idParam,
-        includi_cartelle: z
-          .boolean()
-          .default(false)
-          .describe("Aggiunge le cartelle personali dell'utente che contengono l'abstract."),
+        ...cartelleShape(personalArea, "l'abstract"),
         area: areaParam,
       },
       annotations: READ_ONLY,
     },
-    ({ id, includi_cartelle, area }, { signal }) =>
+    (args, { signal }) =>
       withBdp(signal, async (ctx) => {
+        const { id, area } = args;
         const item = await getAbstract(ctx, id, area);
         if (!item) throw notFound("abstract", id);
-        const cartelle = includi_cartelle ? await getCartelleDelDocumento(ctx, "abstract", id) : undefined;
+        const cartelle = personalArea && wantsCartelle(args) ? await getCartelleDelDocumento(ctx, "abstract", id) : undefined;
         const riferimento = (a: { id: string; titolo?: string | null | undefined } & Parameters<typeof estremi>[0]) => ({
           id: a.id,
           titolo: a.titolo,
@@ -181,7 +196,7 @@ export const registerReadTools = (server: McpServer): void => {
           annotazione: item.annotazione,
           precedenti_conformi: (item.precedente_conforme ?? []).map(riferimento),
           precedenti_difformi: (item.precedente_difforme ?? []).map(riferimento),
-          note_personali: item.note,
+          ...(personalArea ? { note_personali: item.note } : {}),
           ...(cartelle ? { cartelle_personali: cartelle } : {}),
         });
       }),

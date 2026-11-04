@@ -14,7 +14,7 @@ usando **la tua** sessione SPID, CIE, CNS o eIDAS.
 
 | Strumento | A cosa serve |
 |---|---|
-| `stato_sessione`, `accedi` | Controlla la sessione; apre il browser per l'accesso |
+| `stato_sessione`, `accedi`, `esci` | Controlla la sessione; apre il browser per l'accesso; cancella sessione e profilo del browser |
 | `risolvi_criteri` | Trasforma "tribunale di Bologna" nel criterio esatto `ufficio: TRIBUNALE DI BOLOGNA` |
 | `cerca_provvedimenti` | Sentenze, ordinanze e decreti per testo (tutte le parole, almeno una, frase esatta), criteri e date |
 | `cerca_abstract` | Gli abstract, cioè le sintesi dei principi affermati |
@@ -143,7 +143,8 @@ protegge anche il tuo account.
 |---|---|---|
 | `BDM_DOWNLOAD_DIR` | `~/Downloads/banca-dati-merito` | Dove `scarica_documento` salva i PDF |
 | `BDM_MIN_INTERVAL_MS` | `1000` | Pausa minima tra due richieste (mai sotto 250) |
-| `BDM_HOME` | cartella dati del sistema | Dove salvare sessione e profilo del browser |
+| `BDM_HOME` | cartella dati del sistema | Dove salvare sessione e profilo del browser. Rifiutata se è dentro OneDrive, Dropbox, Google Drive o iCloud |
+| `BDM_PERSONAL_AREA` | `on` | `off` nasconde all'assistente cartelle personali, ricerche salvate e note personali |
 
 ## Come funziona
 

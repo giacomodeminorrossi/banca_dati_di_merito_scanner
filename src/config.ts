@@ -1,5 +1,5 @@
 import { homedir } from "node:os";
-import { isAbsolute, join } from "node:path";
+import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import { BdpError } from "./errors.ts";
 
 export const BDP_HOST = "bdp.giustizia.it";
@@ -49,10 +49,62 @@ export const minIntervalMs = (): number => {
   return Math.max(FLOOR_MIN_INTERVAL_MS, parsed);
 };
 
+const OFF = new Set(["off", "false", "0", "no"]);
+const ON = new Set(["on", "true", "1", "yes", "si", "sì"]);
+
+/**
+ * Whether the tools and fields that expose the user's personal area (folders,
+ * saved searches, personal notes) are offered to the model. On by default;
+ * `BDM_PERSONAL_AREA=off` keeps that data away from the AI provider.
+ */
+export const personalAreaEnabled = (): boolean => {
+  const raw = envValue("BDM_PERSONAL_AREA")?.toLowerCase();
+  if (raw === undefined || ON.has(raw)) return true;
+  if (OFF.has(raw)) return false;
+  throw new Error(`BDM_PERSONAL_AREA deve essere "on" oppure "off": ${raw}`);
+};
+
+/** True when `path` is `folder` or below it (on Windows `relative` ignores case). */
+const isInside = (path: string, folder: string): boolean => {
+  const rel = relative(resolve(folder), resolve(path));
+  return rel === "" || (rel !== ".." && !rel.startsWith(`..${sep}`) && !isAbsolute(rel));
+};
+
+/** Folders whose content a sync client copies to someone else's servers. */
+const syncedFolders = (): string[] => {
+  const home = homedir();
+  const fromEnv = ["OneDrive", "OneDriveCommercial", "OneDriveConsumer"]
+    .map((name) => process.env[name]?.trim())
+    .filter((value): value is string => Boolean(value));
+  return [
+    ...fromEnv,
+    join(home, "OneDrive"),
+    join(home, "Dropbox"),
+    join(home, "Google Drive"),
+    join(home, "iCloudDrive"),
+    join(home, "Library", "CloudStorage"),
+    join(home, "Library", "Mobile Documents"),
+  ];
+};
+
+/** The synced folder that contains `path`, if any. */
+export const syncedFolderOf = (path: string): string | undefined =>
+  syncedFolders().find((folder) => isInside(path, folder));
+
 /** Per-user folder for the session file and the dedicated browser profile. */
 export const appDir = (): string => {
   const override = envValue("BDM_HOME");
-  if (override) return override;
+  if (override) {
+    // The session file is a live login: in a synced folder it would leave the computer.
+    const synced = syncedFolderOf(override);
+    if (synced) {
+      throw new BdpError(
+        "parametri",
+        `BDM_HOME (${override}) è dentro una cartella sincronizzata (${synced}): la sessione uscirebbe dal computer. Scegli una cartella locale.`,
+      );
+    }
+    return override;
+  }
   switch (process.platform) {
     case "darwin":
       return join(homedir(), "Library", "Application Support", APP_NAME);

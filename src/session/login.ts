@@ -31,6 +31,9 @@ let running: Promise<Session> | null = null;
 
 export const loginState = (): LoginState => state;
 
+/** True while a login window is open; logout must wait, the profile is in use. */
+export const loginInProgress = (): boolean => running !== null;
+
 /**
  * Playwright's test-harness defaults that weaken a browser where people sign in
  * with SPID or CIE: a fixed key instead of the OS keychain for the profile's
