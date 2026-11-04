@@ -1,6 +1,6 @@
-# Installing on Windows (commit `6b217bd`)
+# Installing on Windows (commit `4007b70`)
 
-These steps install commit `6b217bdca7818fe3e4fcc14bf6fb4b2315a97cb6`: the reviewed upstream code
+These steps install commit `4007b70c0d980f61ac7f637d14e7294d73481fd5`: the reviewed upstream code
 (`bb90888`, v0.1.2) plus the improvements listed in `SECURITY-REVIEW.md`, with dependencies
 taken from the lockfile. Run every command in **PowerShell** (not as Administrator).
 
@@ -45,14 +45,14 @@ cd banca-dati-merito-mcp
 ```
 
 ```powershell
-git checkout --detach 6b217bdca7818fe3e4fcc14bf6fb4b2315a97cb6
+git checkout --detach 4007b70c0d980f61ac7f637d14e7294d73481fd5
 ```
 
 ```powershell
 git rev-parse HEAD
 ```
 
-The last command must print `6b217bdca7818fe3e4fcc14bf6fb4b2315a97cb6`. Then install the locked
+The last command must print `4007b70c0d980f61ac7f637d14e7294d73481fd5`. Then install the locked
 dependencies (no install scripts) and compile:
 
 ```powershell
