@@ -98,61 +98,53 @@ verificarlo sul PC dell'utente.
 8. C'è un passaggio di **consenso** ("acconsenti a inviare i dati a…") da cliccare a
    ogni accesso?
 
-### B. Aspetti legali e di policy
+### B. Portachiavi del sistema da Node.js
 
-9. Termini d'uso di CieID / Ministero dell'Interno: l'**inserimento automatico** delle
-   credenziali dell'utente stesso, sul suo computer, è vietato o sconsigliato? Cita il
-   testo pertinente.
-10. Termini d'uso della Banca Dati di Merito sull'accesso automatizzato.
-11. Rischi per l'utente (es. sospensione dell'identità digitale) e come ridurli.
-
-### C. Portachiavi del sistema da Node.js
-
-12. Quale libreria usare oggi (novembre 2026) per il portachiavi di sistema da
+9. Quale libreria usare oggi (novembre 2026) per il portachiavi di sistema da
     Node ≥ 22 su macOS, Windows e Linux? `keytar` è archiviato: valuta alternative
     mantenute (es. `@napi-rs/keyring`, `cross-keychain` o comandi di sistema come
     `security` su macOS, `cmdkey`/PowerShell `CredentialManager` su Windows,
     `secret-tool` su Linux). Indica manutenzione, licenza, binari precompilati e
     compatibilità con il pacchetto `.mcpb` di Claude Desktop (`scripts/pack-mcpb.sh`) e
     con `npx`.
-13. Come gestire Linux senza Secret Service (server headless): rifiutare, oppure un
+10. Come gestire Linux senza Secret Service (server headless): rifiutare, oppure un
     file 0600 con avviso esplicito?
 
-### D. Automazione con Playwright
+### C. Automazione con Playwright
 
-14. Strategia di selezione robusta per le pagine del Ministero e di CIE (ruoli ARIA,
+11. Strategia di selezione robusta per le pagine del Ministero e di CIE (ruoli ARIA,
     etichette, testo visibile) invece di selettori CSS fragili. Indica **cosa serve
     raccogliere dal PC dell'utente** per fissarli: HTML e screenshot di ogni schermata,
     con i campi sensibili oscurati.
-15. Il login automatico può girare con la finestra **minimizzata o fuori schermo**
+12. Il login automatico può girare con la finestra **minimizzata o fuori schermo**
     invece che `headless`, senza cambiare lo User-Agent catturato? La modalità
     headless cambierebbe lo UA (`HeadlessChrome`) e romperebbe il legame della
     sessione: confermalo e proponi un'alternativa.
-16. Come impedire che password e identificativo finiscano in log, trace di Playwright,
+13. Come impedire che password e identificativo finiscano in log, trace di Playwright,
     screenshot di debug, messaggi d'errore o risposte MCP al modello.
-17. Come evitare due login automatici in parallelo (più app che usano lo stesso
+14. Come evitare due login automatici in parallelo (più app che usano lo stesso
     server/profilo; oggi esiste già un controllo del lock del profilo in
     `src/session/logout.ts`).
 
-### E. Integrazione nel progetto
+### D. Integrazione nel progetto
 
-18. Dove si aggancia il login automatico: solo su `accedi`, oppure anche in automatico
+15. Dove si aggancia il login automatico: solo su `accedi`, oppure anche in automatico
     quando una chiamata riceve 401 o la sessione è scaduta? Valuta il rischio di
     notifiche inattese o ripetute e proponi un limite (es. al massimo un tentativo
     automatico ogni N minuti, mai più di uno dopo un rifiuto).
-19. Nuovi comandi CLI e strumenti MCP necessari (es. `credenziali imposta`,
+16. Nuovi comandi CLI e strumenti MCP necessari (es. `credenziali imposta`,
     `credenziali cancella`, `login --automatico`) e come `esci`/`logout` deve
     comportarsi con le credenziali salvate.
-20. Variabili d'ambiente o impostazioni dell'estensione `.mcpb` (`manifest.json`) da
+17. Variabili d'ambiente o impostazioni dell'estensione `.mcpb` (`manifest.json`) da
     aggiungere, ad esempio per attivare/disattivare la modalità automatica.
-21. Test: cosa si può testare senza la vera pagina CIE (pagine HTML finte servite in
+18. Test: cosa si può testare senza la vera pagina CIE (pagine HTML finte servite in
     locale e simulate con Playwright, stati di errore) e cosa resta un test manuale.
-22. Documenti da aggiornare: README, `SECURITY-REVIEW.md`, nuovo ADR (o modifica
+19. Documenti da aggiornare: README, `SECURITY-REVIEW.md`, nuovo ADR (o modifica
     dell'ADR 0001) per la custodia delle credenziali.
 
 ## Cosa devi consegnare
 
-1. **Tabella delle verifiche**: per ognuno dei 22 punti, risposta, certezza
+1. **Tabella delle verifiche**: per ognuno dei 19 punti, risposta, certezza
    (verificato / probabile / da verificare) e fonte.
 2. **Bloccanti**: cosa impedirebbe la modifica (es. livello 3 obbligatorio, captcha,
    divieto esplicito nei termini) e alternative (es. QR code con app CieID).
