@@ -146,8 +146,8 @@ verificarlo sul PC dell'utente.
 
 1. **Tabella delle verifiche**: per ognuno dei 19 punti, risposta, certezza
    (verificato / probabile / da verificare) e fonte.
-2. **Bloccanti**: cosa impedirebbe la modifica (es. livello 3 obbligatorio, captcha,
-   divieto esplicito nei termini) e alternative (es. QR code con app CieID).
+2. **Bloccanti**: cosa impedirebbe la modifica (es. livello 3 obbligatorio,
+   captcha) e alternative (es. QR code con app CieID).
 3. **Checklist per l'utente**: le cose che solo l'utente può fare o fornire sul suo
    PC. Per ognuna: istruzioni passo passo semplici, in italiano, e cosa oscurare.
    Esempi: catturare HTML e screenshot di ogni schermata del login CIE, verificare se
